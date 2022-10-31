@@ -35,7 +35,7 @@ BOOL RequestWRQ() {
 	//TRQ TranceferRQ;
 	//SendWRQ();
 	////Recvdata();
-	//SendACK();
+	//SendACeK();
 	//while (RecvData()) {
 	//	checkData();
 	//	WriteData();
