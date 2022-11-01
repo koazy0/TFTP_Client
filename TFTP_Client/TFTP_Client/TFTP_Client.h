@@ -20,6 +20,8 @@
 #define ACK		0x0004
 #define ERR		0x0005
 
+#define	PACKET_ERR		-1
+
 struct RRQ
 {
 	WORD OP;
@@ -35,6 +37,8 @@ struct TRQ
 	WORD OP;
 	char data[512];
 };
+
+typedef TRQ* PRQ_Information;
 
 struct ARQ
 {

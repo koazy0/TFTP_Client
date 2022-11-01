@@ -7,27 +7,62 @@ int addrlen;
 WSADATA wsaData;
 sockaddr_in servAddr;
 sockaddr fromAddr;
+PRQ_Information Information;
 
 //创建套接字
 SOCKET sock;
 
 using namespace std;
 
-
-int DealWithRQ(WORD OP) {
-	switch (OP) {
-	case 1:
-	case 2:
-	case 3:
-	case 4:
-	case 5:
+void ShowError(PRQ_Information, int code) {
+	cout << "ShowError\n\n";
+	switch (code)
+	{
+	case ERROR:
+	case PACKET_ERR:
 		break;
 	default:
-		
-		//checkerror();
 		break;
 	}
-	return 0;
+}
+
+void Download(PRQ_Information Information, FILE *fp) {
+	//
+	//while (1) {
+	//	checkData();
+	//	//RecordData();
+	//	RecordNum();
+	//	SendACK();
+	//	if (1 < 512)
+	//		closeconnction();
+	//	break;
+	//}
+}
+
+int SendRRQ(char *file) {
+	cout << "Send RRQ\n\n";
+	return 1;
+}
+
+int RecvPack(PRQ_Information Informtion) {
+	DWORD OP;
+	switch (OP) {
+	case 1:
+		
+	case 2:
+
+	case 3:
+
+	case 4:
+		return 1;		//return the length of packet
+	case 5:
+		cout << "12345\n\n";
+		return ERROR;
+	default:
+		cout << "error\n\n";
+		//checkerror();
+		return PACKET_ERR;
+	}
 }
 
 BOOL RequestWRQ() {
@@ -45,24 +80,42 @@ BOOL RequestWRQ() {
 	//		closeconnction();
 	//	break;
 	//}
-	cout << "hello world!\n\n";
+	cout << "Upload File\n";
 	return TRUE;
 }
 
+
 BOOL RequestRRQ() {
-	cout << "hello world!\n\n";
-	//TRQ TranceferRQ;
-	//SendRRQ();
-	//
-	//while (1) {
-	//	checkData();
-	//	//RecordData();
-	//	RecordNum();
-	//	SendACK();
-	//	if (1 < 512)
-	//		closeconnction();
-	//	break;
-	//}
+	char file[30]; int recv; FILE *fp;
+	PRQ_Information Information=new(TRQ);
+	
+	while (1) {
+		cout << "Download files\n\n";
+		cout << "Input the filename:\n";
+		cout << "send 'q' to quit\n";
+		cin >> file;
+		if (file[0] == 'q') exit(0);
+		SendRRQ(file);
+		recv = RecvPack(Information);
+		if (recv == PACKET_ERR) {
+			ShowError(Information,recv);
+			system("pause");
+			system("cls");
+		}
+		else if (recv == ERROR) {
+			ShowError(Information, recv);
+			system("pause");
+			system("cls");
+		}
+		else {
+			Download(Information,fp);
+			cout << "Download Ends\n\n";
+			system("pause");
+			system("cls");
+		}		
+	}	
+	
+	free(Information);
 	return TRUE;
 }
 
