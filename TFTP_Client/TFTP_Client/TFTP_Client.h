@@ -10,8 +10,12 @@
 #pragma comment(lib, "ws2_32.lib")  //加载 ws2_32.dll
 
 
-#define RT "netascii"	//传输字符串
-#define RB "octet"		//传输二进制
+#define RT_C "netascii"		//传输字符串
+#define RT 0x01		//传输字符串
+#define RB_C "octet"		//传输二进制
+#define RB 0x02		//传输二进制
+
+
 
 //definition of opcode
 #define READ	0x0001
@@ -27,7 +31,6 @@ struct RRQ
 	WORD OP;
 	char FileName[20];
 	char Mode[20];
-
 };
 
 typedef RRQ WRQ;
@@ -35,21 +38,16 @@ typedef RRQ WRQ;
 struct TRQ
 {
 	WORD OP;
-	char data[512];
+	WORD Number;
+	char Data[512];
 };
 
-typedef TRQ* PRQ_Information;
+typedef TRQ ERQ,*PRQ_Information;
 
 struct ARQ
 {
 	WORD OP;
 	WORD Number;
-};
-
-struct ERQ
-{
-	WORD OP;
-	WORD ErrorCode;
 };
 
 
@@ -67,7 +65,7 @@ int length(char *) {
 }
 
 int RecvTRQ(TRQ TranceferRQ) {
-	return length(TranceferRQ.data);
+	return length(TranceferRQ.Data);
 }
 
 void checkData() {
