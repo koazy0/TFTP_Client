@@ -1,4 +1,5 @@
 ﻿#define _WINSOCK_DEPRECATED_NO_WARNINGS
+#define _CRT_SECURE_NO_WARNINGS
 #include <stdio.h>
 #include<WinSock2.h>
 #include<Windows.h>
@@ -20,8 +21,9 @@ int main(int argc, char *argv[])
 	struct sockaddr_in saddr;
 	struct sockaddr_in remote_addr;
 	char buff[BUFF_SIZE];
-	int res, len;
-
+	int res, len, count;
+	FILE *fp=fopen("recv.txt","w");
+	
 	//1. create socket
 	sockfd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (-1 == sockfd)
@@ -44,26 +46,35 @@ int main(int argc, char *argv[])
 		perror("udp server bind: ");
 		return -1;
 	}
-
-	while (1) {
+	memset(buff, 0, BUFF_SIZE);
+	do {
 		//4. recvfrom
+		count =0;
 		printf("Wait for a packet ...\n");
 		sin_len = sizeof(struct sockaddr_in);
 		len = recvfrom(sockfd, buff, BUFF_SIZE, 0, (struct sockaddr *)&remote_addr, &sin_len);
+
+		while (buff[count] != EOF && count < 512) {
+			fputc(buff[count++], fp);
+		}
 		if (-1 == len)
 		{
 			perror("udp server recvform: ");
 			return -1;
 		}
 		buff[len] = '\0';
-
-		printf("Recived packet from %s, contents is: %s \n", \
-			inet_ntoa(remote_addr.sin_addr), buff);
-	}
+		
+		printf(" contents is: %s \n", \
+			 buff);
+		
+		
+	} while (count ==512);
+	printf("Wait for a packet ...\n");
 	
 
 
 	//5. close
+	fclose(fp);
 	closesocket(sockfd);
 	WSACleanup();
 	return 0;
