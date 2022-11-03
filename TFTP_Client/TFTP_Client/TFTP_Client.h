@@ -1,5 +1,5 @@
 #pragma once
-
+#define _CRT_SECURE_NO_WARNINGS
 #define _WINSOCK_DEPRECATED_NO_WARNINGS
 
 #include<WinSock2.h>
@@ -15,7 +15,7 @@
 #define RB_C "octet"		//传输二进制
 #define RB 0x02		//传输二进制
 
-
+#define BUF_SIZE 1024
 
 //definition of opcode
 #define READ	0x0001
@@ -51,48 +51,17 @@ struct ARQ
 };
 
 
-BOOL SendRRQ() {
-	return TRUE;
-}
-
-BOOL SendACK() {
-	return TRUE;
-}
-
-
-int length(char *) {
-	return 1;
-}
-
-int RecvTRQ(TRQ TranceferRQ) {
-	return length(TranceferRQ.Data);
-}
 
 void checkData() {
 
 }
 
-
-BOOL WriteData() {
-	return TRUE;
-}
-BOOL RecordNum() {
-	return TRUE;
-}
-
-BOOL closeconnction() {
-	return TRUE;
-}
-
-int RecvData() {
+int RecordLog() {
 	return 1;
-}
-void SendWRQ() {
-
 }
 
 BOOL RequestRRQ();
 BOOL RequestWRQ();
 
 void menu();
-void init();
+int init();

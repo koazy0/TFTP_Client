@@ -3,15 +3,21 @@
 #include"TFTP_Client.h"
 
 CString Strtmp;
-int addrlen;
+int sizeofsockaddr =sizeof(sockaddr);
 WSADATA wsaData;
-sockaddr_in servAddr;
-sockaddr fromAddr;
-PRQ_Information Information;
+
+//目标addr,recv addr
+sockaddr_in servAddr, bindaddr;
+//发送sock,接收sock
+SOCKET sock, sockrecv;
+
+char buf[1024];
+
+PRQ_Information Information=new(TRQ);
 
 //定义五个全局变量 方便处理
 RRQ rrq; WRQ wrq; TRQ trq; ERQ erq; ARQ arq;
-SOCKET sock;
+
 
 using namespace std;
 
@@ -29,20 +35,8 @@ void ShowError(PRQ_Information Information, int code) {
 	}
 }
 
-void Download(PRQ_Information Information, FILE *fp) {
-	
-	cout << "Download()\n";
-	//
-	//while (1) {
-	//	checkData();
-	//	//RecordData();
-	//	RecordNum();
-	//	SendACK();
-	//	if (1 < 512)
-	//		closeconnction();
-	//	break;
-	//}
-}
+
+
 
 void FillMode(char *dst,int mode) {
 	switch (mode) {
@@ -54,6 +48,7 @@ void FillMode(char *dst,int mode) {
 		break;
 	}
 }
+
 void Fill_ERROR(char *dst,int ErrorCode) {
 	//实验报告里面没要求写这个
 	//这里补充在这里芝士为了体现完整性
@@ -68,6 +63,17 @@ void Fill_ERROR(char *dst,int ErrorCode) {
 		break;
 	}
 }
+
+int SendPacket(void *dst,int size) {
+	int count = sendto(sock, (char*)dst, size, 0, (struct sockaddr*)&servAddr, sizeof(servAddr));
+	if (count == SOCKET_ERROR) {
+		Strtmp.Format("Error code:%d", WSAGetLastError());
+		MessageBox(NULL, Strtmp, "SendPacket Error!", MB_OK);
+	}
+	return count;
+	 
+}
+
 int SendRQ(char *file,int mode,WORD code) {
 	int count; char *tmp;
 	switch (code) {
@@ -84,11 +90,7 @@ int SendRQ(char *file,int mode,WORD code) {
 			rrq.OP = code;					//fill the opcode
 
 			//send the packet
-			count = sendto(sock, (char*)&rrq, sizeof(RRQ), 0, (struct sockaddr*)&servAddr, sizeof(servAddr));
-			if (count == SOCKET_ERROR) {
-				Strtmp.Format("Error code:%d", WSAGetLastError());
-				MessageBox(NULL, Strtmp, "Send RRQ Error!", MB_OK);
-			}
+			count=SendPacket(&rrq, sizeof(RRQ));
 			cout << "Send RRQ\n\n";
 			return count;
 
@@ -100,19 +102,15 @@ int SendRQ(char *file,int mode,WORD code) {
 			while (file) {
 				*tmp++ = *file++;	//strcpy
 			}
-			FillMode(rrq.Mode, mode);
+			FillMode(wrq.Mode, mode);
 			wrq.OP = code;
 
 
-			count = sendto(sock, (char*)&rrq, sizeof(RRQ), 0, (struct sockaddr*)&servAddr, sizeof(servAddr));
-			if (count == SOCKET_ERROR) {
-				Strtmp.Format("Error code:%d", WSAGetLastError());
-				MessageBox(NULL, Strtmp, "Send WRQ Error!", MB_OK);
-			}
+			count = SendPacket(&wrq, sizeof(WRQ));
 			cout << "Send WRQ\n\n";
 			return count;
-		case TRAN:
 
+		case TRAN:
 			count = 123;
 			return count;
 			//
@@ -123,14 +121,9 @@ int SendRQ(char *file,int mode,WORD code) {
 			arq.Number = mode;
 
 			//send the ACK packet
-			count = sendto(sock, (char*)&arq, sizeof(ARQ), 0, (struct sockaddr*)&servAddr, sizeof(servAddr));
-			if (count == SOCKET_ERROR) {
-				Strtmp.Format("Error code:%d", WSAGetLastError());
-				MessageBox(NULL, Strtmp, "Send WRQ Error!", MB_OK);
-			}
-			cout << "Send WRQ\n\n";
+			count = SendPacket(&arq, sizeof(ARQ));
+			cout << "Send ARQ\n\n";
 			return count;
-
 
 		case ERR:
 			memset(&erq, 0, sizeof(ERQ));
@@ -139,24 +132,42 @@ int SendRQ(char *file,int mode,WORD code) {
 			tmp = erq.Data;
 			Fill_ERROR(tmp,mode);
 
-			return ERROR;
+			count = SendPacket(&erq, sizeof(ERQ));
+			cout << "Send ERQ\n\n";
+			return count;
+
 		default:
 			return -1;
 	}
 }
 
-int RecvPack(PRQ_Information Informtion) {
-	DWORD OP=1;
-	switch (OP) {
-	case 1:
-		
-	case 2:
+int RecvPack(PRQ_Information Information) {
+	int len = recvfrom(sock, buf, BUF_SIZE, 0, (struct sockaddr *)&bindaddr, &sizeofsockaddr);
+	if (PACKET_ERR == len)
+	{
+		cout<<"udp server recv error ";
+		return -1;
+	}
+	buf[len] = '\0';
+	
+	
 
+	//switch opcode
+	switch ((WORD)*buf) {
 	case 3:
-
+		
+		//接收数据包的时候trq和才会更新
+		memcpy(&trq,buf,sizeof(TRQ));
+		trq.OP = len - 4;		//data段的长度
+		return len;	//return的是data的长度
+		//data包
 	case 4:
-		return 1;		//return the length of packet
+		//ack数据包
+		memcpy(&arq,buf, sizeof(ARQ));
+		return len;		//return the length of packet
 	case 5:
+		//Err包
+		memcpy(&erq, buf, sizeof(ERQ));
 		cout << "12345\n\n";
 		return ERROR;
 	default:
@@ -166,8 +177,39 @@ int RecvPack(PRQ_Information Informtion) {
 	}
 }
 
+void Download(PRQ_Information Information, FILE *fp) {
+	//这时PRQ_Information 存储着第一个包的信息
+	cout << "Download()\n";
+	int record = 1;		//记录包数
+	while (1) {
+		if (trq.OP < 512) break;
+		else if (trq.Number != record) {
+			
+			//中途有包丢失,或者传来的是error包
+			//这个时候信息存储在erq中
+			//不需要发送响应包
+			RecordLog();
+		}
+		else {
+
+			//将缓存输入文件中
+			
+			//发送响应包
+			//执行下一个接收
+		}
+		record++;
+	}
+
+	//输入文件中
+
+
+	
+}
+
+//下载文件
 BOOL RequestRRQ() {
-	char file[30] = {0}; int recv; FILE *fp=NULL;
+	char file[30] = {0},mode; int recv; FILE *fp=NULL;
+	
 	PRQ_Information Information=new(TRQ);
 	
 	while (1) {
@@ -175,12 +217,37 @@ BOOL RequestRRQ() {
 		cout << "Input the filename:\n";
 		cout << "send 'q' to quit\n";
 		cin >> file;
-		if (file[0] == 'q') exit(0);
+		system("cls");
+		cout << "Choose the mode and input the number\n\n";
+		cout << "1 : netascii\n";
+		cout << "2 : octet\n";
+		cout << "send 'q' to quit\n";
+		cin >> mode;
+
+		if (file[0] == 'q'||mode=='q') exit(0);
 		else if (!file) {
 			cout << "Input error! Please retype!\n";
 		}
 		else {
-			SendRQ(file,0x01,READ);
+			
+			//choose the mode of RRQ
+			switch (mode)
+			{
+			case '1':
+				SendRQ(file, RT, READ);
+				fp = fopen(file, "rt+");
+				break;
+			case '2':
+				SendRQ(file, RT, READ);
+				fp = fopen(file, "rb+");
+			default:
+				break;
+			}
+			if (!fp) {
+				Strtmp.Format("Open file %s Error!",file);
+				MessageBox(NULL, Strtmp, "File Error", MB_OK);
+			}
+
 			recv = RecvPack(Information);
 			if (recv == PACKET_ERR || recv == ERROR) {
 				ShowError(Information, recv);
@@ -188,6 +255,7 @@ BOOL RequestRRQ() {
 				system("cls");
 			}
 			else {
+				
 				Download(Information, fp);
 				cout << "Download Ends\n\n";
 				system("pause");
@@ -198,7 +266,6 @@ BOOL RequestRRQ() {
 	free(Information);
 	return TRUE;
 }
-
 
 BOOL RequestWRQ() {
 
@@ -226,9 +293,17 @@ void menu() {
 	cout << "0.Exit\n";
 }
 
-void init() {
+int init() {
 	char ip[20];
 	int port,tmp;
+	
+	//绑定发送接收端口
+	bindaddr.sin_family = AF_INET;
+	bindaddr.sin_port = htons(10000);
+	bindaddr.sin_addr.s_addr=INADDR_ANY;
+	bind(sock, (struct sockaddr*)&bindaddr, sizeofsockaddr);
+	bind(sockrecv, (struct sockaddr*)&bindaddr, sizeofsockaddr);
+	
 	while (1) {
 		while (1)		//命令行界面
 		{
@@ -256,6 +331,7 @@ void init() {
 
 		}
 		while (1) {
+
 			system("cls");
 			menu();
 			cin >> tmp;
@@ -264,11 +340,11 @@ void init() {
 				case 1:
 					RequestRRQ();
 					Sleep(1000);
-					break;
+					return 0;
 				case 2:
 					RequestWRQ();
 					Sleep(1000);
-					break;
+					return 0;
 				case 0:
 					exit(0);
 				default:
